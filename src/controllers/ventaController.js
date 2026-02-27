@@ -19,9 +19,8 @@ const registrarVenta = async (req, res) => {
     try {
         await connection.beginTransaction(); // Empezamos la transacción ACID
 
-        // PASO A: Guardado local (Temporal para tu entorno XAMPP)
-        // Nota: Cuando subamos esto a producción, cambiaremos esta URL
-        const urlCaptura = `http://localhost:3000/capturas/${archivoCaptura.filename}`;
+        // PASO A: Capturar la URL que nos devuelve Cloudinary
+        const urlCaptura = archivoCaptura.path;
 
         // PASO B: Registrar la Venta Principal en la tabla 'ventas'
         const [resultVenta] = await connection.query(
