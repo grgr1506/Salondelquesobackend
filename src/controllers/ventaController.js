@@ -2,19 +2,29 @@ const pool = require('../config/db');
 // const { subirPorFTP } = require('../services/ftpService'); // Comentado temporalmente para la prueba local
 
 const registrarVenta = async (req, res) => {
-    // 1. Recibimos los datos del frontend (incluyendo los nuevos campos solicitados)
+    // 1. Recibimos los datos del frontend
     const { nombre_vendedor, detalle_compra, metodo_pago, tipo_documento, celular, total, carrito } = req.body;
     const archivoCaptura = req.file; 
 
-    if (!archivoCaptura || !carrito) {
-        return res.status(400).json({ mensaje: 'Faltan datos o la captura de pantalla' });
+    // 2. Validar que el carrito exista
+    if (!carrito) {
+        return res.status(400).json({ mensaje: 'Faltan los datos del carrito' });
     }
+
+    // 3. Validar la captura SOLO si el método es Yape/Plin
+    if (metodo_pago === 'Yape/Plin' && !archivoCaptura) {
+        return res.status(400).json({ mensaje: 'Falta la captura de pantalla para pagos con Yape/Plin' });
+    }
+
+    // 4. Asignar la URL (si hay archivo, usamos el enlace de Cloudinary; si no, queda en null)
+    const urlCaptura = archivoCaptura ? archivoCaptura.path : null;
 
     // Convertimos el carrito que viene como texto (JSON) a un objeto de JavaScript
     const productosCarrito = JSON.parse(carrito);
 
     // SOLICITAMOS UNA CONEXIÓN EXCLUSIVA PARA LA TRANSACCIÓN
     const connection = await pool.getConnection();
+    
 
     try {
         await connection.beginTransaction(); // Empezamos la transacción ACID
