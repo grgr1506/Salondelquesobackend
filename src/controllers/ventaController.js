@@ -18,7 +18,7 @@ const registrarVenta = async (req, res) => {
 
     // 4. ESTA ES LA LÍNEA CLAVE: Si hay archivo extrae el path, si no, guarda null.
     // Así evitamos el error "Cannot read properties of undefined"
-    const urlCaptura = archivoCaptura ? archivoCaptura.path : null;
+    const urlCaptura = archivoCaptura ? archivoCaptura.path : '';
 
     // Convertimos el carrito que viene como texto (JSON) a un objeto de JavaScript
     const productosCarrito = JSON.parse(carrito);
