@@ -16,32 +16,28 @@ const registrarVenta = async (req, res) => {
         return res.status(400).json({ mensaje: 'Falta la captura de pantalla para pagos con Yape/Plin' });
     }
 
-    // 4. Asignar la URL (si hay archivo, usamos el enlace de Cloudinary; si no, queda en null)
+    // 4. ESTA ES LA LÍNEA CLAVE: Si hay archivo extrae el path, si no, guarda null.
+    // Así evitamos el error "Cannot read properties of undefined"
     const urlCaptura = archivoCaptura ? archivoCaptura.path : null;
 
     // Convertimos el carrito que viene como texto (JSON) a un objeto de JavaScript
     const productosCarrito = JSON.parse(carrito);
 
-    // SOLICITAMOS UNA CONEXIÓN EXCLUSIVA PARA LA TRANSACCIÓN
+    // Solicitamos conexión para la transacción
     const connection = await pool.getConnection();
-    
 
     try {
-        await connection.beginTransaction(); // Empezamos la transacción ACID
+        await connection.beginTransaction(); 
 
-        // PASO A: Capturar la URL que nos devuelve Cloudinary
-        const urlCaptura = archivoCaptura.path;
-
-        // PASO B: Registrar la Venta Principal en la tabla 'ventas'
+        // Insertamos la Venta Principal
         const [resultVenta] = await connection.query(
             'INSERT INTO ventas (nombre_vendedor, detalle_compra, metodo_pago, tipo_documento, celular, url_captura, total) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [nombre_vendedor, detalle_compra, metodo_pago, tipo_documento, celular, urlCaptura, total]
         );
-        const ventaId = resultVenta.insertId; // Capturamos el ID de la venta recién creada
+        const ventaId = resultVenta.insertId; 
 
-        // PASO C: Registrar el Detalle y Descontar Stock
+        // Registramos el Detalle y Descontamos Stock
         for (const item of productosCarrito) {
-            // 1. Verificamos si hay stock suficiente bloqueando la fila momentáneamente
             const [rows] = await connection.query('SELECT stock FROM productos WHERE id = ? FOR UPDATE', [item.id]);
             const stockActual = rows[0].stock;
 
@@ -49,30 +45,25 @@ const registrarVenta = async (req, res) => {
                 throw new Error(`Stock insuficiente para el producto: ${item.nombre}. Stock actual: ${stockActual}`);
             }
 
-            // 2. Insertamos en el detalle de la venta
             await connection.query(
                 'INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)',
                 [ventaId, item.id, item.cantidad, item.precio, item.cantidad * item.precio]
             );
 
-            // 3. Descontamos el stock de la tabla productos
             await connection.query(
                 'UPDATE productos SET stock = stock - ? WHERE id = ?',
                 [item.cantidad, item.id]
             );
         }
 
-        // SI TODO SALIÓ BIEN, CONFIRMAMOS LOS CAMBIOS EN LA BASE DE DATOS
         await connection.commit();
         res.status(201).json({ mensaje: 'Venta registrada con éxito', ventaId });
 
     } catch (error) {
-        // SI ALGO FALLÓ (ej. no había stock de un queso), REVERTIMOS TODO
         await connection.rollback();
         console.error('Error en la transacción de venta:', error);
         res.status(500).json({ mensaje: error.message || 'Error al procesar la venta' });
     } finally {
-        // Siempre liberamos la conexión para que no se sature el servidor
         connection.release();
     }
 };
