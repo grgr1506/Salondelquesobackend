@@ -1,4 +1,3 @@
-// src/controllers/usuarioController.js
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -7,7 +6,6 @@ const crearUsuario = async (req, res) => {
     const { username, password, rol } = req.body;
     
     try {
-        // Encriptar la contraseña (nadie podrá ver la clave real en la BD)
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
@@ -34,13 +32,11 @@ const login = async (req, res) => {
 
         const usuario = rows[0];
         
-        // Comparar la contraseña tipeada con la encriptada en la BD
         const passValido = await bcrypt.compare(password, usuario.password);
         if (!passValido) {
             return res.status(401).json({ mensaje: 'Contraseña incorrecta' });
         }
 
-        // Si es válido, creamos el Token que durará 8 horas
         const token = jwt.sign(
             { id: usuario.id, username: usuario.username, rol: usuario.rol },
             'CLAVE_SECRETA_SISTEMA',
@@ -59,4 +55,27 @@ const login = async (req, res) => {
     }
 };
 
+// --- NUEVAS FUNCIONES AGREGADAS ---
+
+const obtenerUsuarios = async (req, res) => {
+    try {
+        const [usuarios] = await pool.query('SELECT id, username, rol, activo FROM usuarios');
+        res.status(200).json(usuarios);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al obtener usuarios' });
+    }
+};
+
+const actualizarRol = async (req, res) => {
+    const { id } = req.params;
+    const { rol } = req.body;
+    try {
+        await pool.query('UPDATE usuarios SET rol = ? WHERE id = ?', [rol, id]);
+        res.status(200).json({ mensaje: 'Rol actualizado correctamente' });
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al actualizar rol' });
+    }
+};
+
+// Exportamos TODAS las funciones juntas al final
 module.exports = { crearUsuario, login, obtenerUsuarios, actualizarRol };
