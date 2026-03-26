@@ -9,6 +9,6 @@ router.post('/login', login);
 
 // OJO AQUÍ: Por ahora dejaremos esta ruta abierta para que puedas crear tu PRIMER usuario superadmin.
 // Una vez que lo crees, cambiaremos esta línea para protegerla.
-router.post('/crear', crearUsuario); 
+router.post('/crear', verificarToken, esSuperAdmin, crearUsuario);
 
 module.exports = router;
