@@ -3,12 +3,14 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
+const usuarioRoutes = require('./routes/usuarioRoutes');
 
 // Middlewares
 app.use(cors()); // Permite peticiones de otros dominios
 app.use(express.json()); // Permite leer JSON en el body
 app.use(express.urlencoded({ extended: true }));
 app.use('/capturas', express.static('uploads'));
+app.use('/api/usuarios', usuarioRoutes);
 
 // Endpoint de salud para UptimeRobot (Truco 24/7)
 app.get('/api/ping', (req, res) => {
