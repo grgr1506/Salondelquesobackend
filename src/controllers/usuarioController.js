@@ -59,4 +59,4 @@ const login = async (req, res) => {
     }
 };
 
-module.exports = { crearUsuario, login };
+module.exports = { crearUsuario, login, obtenerUsuarios, actualizarRol };
