@@ -2,80 +2,82 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const crearUsuario = async (req, res) => {
-    const { username, password, rol } = req.body;
-    
+const registrarUsuario = async (req, res) => {
+    const { username, password, role } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ mensaje: 'Usuario y contraseña obligatorios' });
+    }
     try {
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-
-        const [result] = await pool.query(
-            'INSERT INTO usuarios (username, password, rol) VALUES (?, ?, ?)',
-            [username, passwordHash, rol]
-        );
-        res.status(201).json({ mensaje: 'Usuario creado exitosamente', id: result.insertId });
+        const [existe] = await pool.query('SELECT * FROM usuarios WHERE username = ?', [username]);
+        if (existe.length > 0) {
+            return res.status(400).json({ mensaje: 'El nombre de usuario ya existe' });
+        }
+        const passwordHash = await bcrypt.hash(password, 10);
+        await pool.query('INSERT INTO usuarios (username, password, role) VALUES (?, ?, ?)', [username, passwordHash, role || 'vendedor']);
+        res.status(201).json({ mensaje: 'Usuario creado con éxito' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ mensaje: 'Error al crear usuario. Es posible que el username ya exista.' });
+        res.status(500).json({ mensaje: 'Error al registrar usuario' });
     }
 };
 
-const login = async (req, res) => {
+const loginUsuario = async (req, res) => {
     const { username, password } = req.body;
-
     try {
-        const [rows] = await pool.query('SELECT * FROM usuarios WHERE username = ? AND activo = 1', [username]);
-        
+        const [rows] = await pool.query('SELECT * FROM usuarios WHERE username = ?', [username]);
         if (rows.length === 0) {
-            return res.status(401).json({ mensaje: 'Usuario no encontrado o inactivo' });
+            return res.status(401).json({ mensaje: 'Usuario o contraseña incorrectos' });
         }
-
         const usuario = rows[0];
-        
-        const passValido = await bcrypt.compare(password, usuario.password);
-        if (!passValido) {
-            return res.status(401).json({ mensaje: 'Contraseña incorrecta' });
+        const coinciden = await bcrypt.compare(password, usuario.password);
+        if (!coinciden) {
+            return res.status(401).json({ mensaje: 'Usuario o contraseña incorrectos' });
         }
-
         const token = jwt.sign(
-            { id: usuario.id, username: usuario.username, rol: usuario.rol },
-            'CLAVE_SECRETA_SISTEMA',
-            { expiresIn: '8h' } 
+            { id: usuario.id, username: usuario.username, role: usuario.role },
+            process.env.JWT_SECRET || 'secreto_seguro_feria',
+            { expiresIn: '24h' }
         );
-
-        res.status(200).json({ 
-            mensaje: 'Login exitoso', 
-            token, 
-            usuario: { username: usuario.username, rol: usuario.rol } 
+        res.status(200).json({
+            token,
+            id: usuario.id,
+            username: usuario.username,
+            role: usuario.role
         });
-
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ mensaje: 'Error en el servidor al intentar iniciar sesión' });
+        res.status(500).json({ mensaje: 'Error al iniciar sesión' });
     }
 };
-
-// --- NUEVAS FUNCIONES AGREGADAS ---
 
 const obtenerUsuarios = async (req, res) => {
     try {
-        const [usuarios] = await pool.query('SELECT id, username, rol, activo FROM usuarios');
-        res.status(200).json(usuarios);
+        const [rows] = await pool.query('SELECT id, username, role FROM usuarios');
+        res.status(200).json(rows);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error al obtener usuarios' });
     }
 };
 
-const actualizarRol = async (req, res) => {
-    const { id } = req.params;
-    const { rol } = req.body;
+// NUEVA FUNCIÓN: Eliminar colaborador de forma definitiva
+const eliminarUsuario = async (req, res) => {
     try {
-        await pool.query('UPDATE usuarios SET rol = ? WHERE id = ?', [rol, id]);
-        res.status(200).json({ mensaje: 'Rol actualizado correctamente' });
+        const { id } = req.params;
+
+        // Regla de seguridad: Impedir auto-eliminación
+        if (req.usuario && req.usuario.id == id) {
+            return res.status(400).json({ mensaje: 'Operación no permitida: No puedes eliminar la cuenta con la que tienes la sesión abierta.' });
+        }
+
+        await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+        res.status(200).json({ mensaje: 'Usuario eliminado con éxito' });
     } catch (error) {
-        res.status(500).json({ mensaje: 'Error al actualizar rol' });
+        console.error(error);
+        res.status(500).json({ mensaje: 'Error interno al intentar eliminar el usuario' });
     }
 };
 
-// Exportamos TODAS las funciones juntas al final
-module.exports = { crearUsuario, login, obtenerUsuarios, actualizarRol };
+module.exports = {
+    registrarUsuario,
+    loginUsuario,
+    obtenerUsuarios,
+    eliminarUsuario
+};
