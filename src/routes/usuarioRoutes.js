@@ -1,22 +1,23 @@
-// src/routes/usuarioRoutes.js
 const express = require('express');
 const router = express.Router();
-const { crearUsuario, login, obtenerUsuarios, actualizarRol, eliminarUsuario } = require('../controllers/usuarioController');
-const { verificarToken, esSuperAdmin } = require('../middlewares/auth');
 
-// Ruta pública para iniciar sesión
-router.post('/login', login);
+// Importamos los archivos completos para evitar errores de desincronización
+const usuarioController = require('../controllers/usuarioController');
+const auth = require('../middlewares/auth');
 
-// Rutas protegidas
-router.post('/crear', verificarToken, esSuperAdmin, crearUsuario);
+// 1. Iniciar sesión (Pública)
+router.post('/login', usuarioController.login);
 
-// OJO: Le quitamos el "esSuperAdmin" a esta ruta para que la cuenta "publico" 
-// pueda leer la lista de vendedores y mostrarla en el menú desplegable.
-router.get('/', verificarToken, obtenerUsuarios);
+// 2. Crear usuario (Protegida)
+router.post('/crear', auth.verificarToken, auth.esSuperAdmin, usuarioController.crearUsuario);
 
-router.put('/:id/rol', verificarToken, esSuperAdmin, actualizarRol);
+// 3. Obtener usuarios (Sin 'esSuperAdmin' para que la cuenta 'publico' pueda leerlos)
+router.get('/', auth.verificarToken, usuarioController.obtenerUsuarios);
 
-// NUEVA RUTA: Solo los SuperAdmins pueden eliminar personal
-router.delete('/:id', verificarToken, esSuperAdmin, eliminarUsuario);
+// 4. Actualizar rol (Protegida)
+router.put('/:id/rol', auth.verificarToken, auth.esSuperAdmin, usuarioController.actualizarRol);
+
+// 5. Eliminar usuario (Protegida)
+router.delete('/:id', auth.verificarToken, auth.esSuperAdmin, usuarioController.eliminarUsuario);
 
 module.exports = router;
