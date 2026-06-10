@@ -21,9 +21,11 @@ app.get('/ping', (req, res) => {
     res.status(200).send('OK');
 });
 
-// Aquí irán las rutas (las conectaremos en el siguiente paso)
- app.use('/api/productos', require('./routes/productoRoutes'));
+// Rutas conectadas
+app.use('/api/productos', require('./routes/productoRoutes'));
 app.use('/api/ventas', require('./routes/ventaRoutes'));
+// NUEVA RUTA CONECTADA AL INDEX
+app.use('/api/reposiciones', require('./routes/reposicionRoutes'));
 
 const PORT = process.env.PORT || 3000;
 
